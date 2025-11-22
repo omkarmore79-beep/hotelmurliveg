@@ -24,3 +24,39 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@font-face {
+  font-family: "Raffishly";
+  src: url("/fonts/Raffishly.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+.glow-button {
+  position: relative;
+  box-shadow: 0 0 20px 2px rgba(255, 225, 0, 0.7);
+  animation: pulseGlow 2s ease-in-out infinite;
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 12px 3px rgba(255, 225, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(255, 225, 0, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 12px 3px rgba(255, 225, 0, 0.4);
+  }
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
