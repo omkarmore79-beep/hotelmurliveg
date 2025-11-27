@@ -1,37 +1,36 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabase } from "../../lib/supabaseClient";
 
 interface Dish {
-  id: string;
+  id: number;
   name: string;
-  price: string;
-  category: string;
-  description: string;
-  image_url?: string;
+  price: number;
+  image_url: string | null;
+  category_id: number;
 }
 
 interface DishFormProps {
   selectedDish: Dish | null;
+  categoryId: number;
   onSave: () => void;
+  onCancel: () => void; // <-- NEW
 }
 
-export default function DishForm({ selectedDish, onSave }: DishFormProps) {
-  const supabase = createClientComponentClient();
-
+export default function DishForm({ selectedDish, categoryId, onSave, onCancel }: DishFormProps) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [category, setCategory] = useState("");
-  const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (selectedDish) {
       setName(selectedDish.name);
-      setPrice(selectedDish.price);
-      setCategory(selectedDish.category);
-      setDescription(selectedDish.description);
+      setPrice(selectedDish.price.toString());
+    } else {
+      setName("");
+      setPrice("");
+      setImageFile(null);
     }
   }, [selectedDish]);
 
@@ -40,16 +39,16 @@ export default function DishForm({ selectedDish, onSave }: DishFormProps) {
 
     let image_url = selectedDish?.image_url ?? null;
 
-    // ---- Image Upload ----
     if (imageFile) {
-      const fileName = `dish-${Date.now()}.${imageFile.name.split(".").pop()}`;
+      const ext = imageFile.name.split(".").pop();
+      const fileName = `dish-${Date.now()}.${ext}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("dishes") // bucket name
+        .from("dishes")
         .upload(fileName, imageFile);
 
       if (uploadError) {
-        alert("Image upload failed: " + uploadError.message);
+        alert("Upload failed: " + uploadError.message);
         return;
       }
 
@@ -58,38 +57,21 @@ export default function DishForm({ selectedDish, onSave }: DishFormProps) {
         .getPublicUrl(uploadData.path).data.publicUrl;
     }
 
-    // ---- Update Dish ----
+    const dishData = {
+      name,
+      price: Number(price),
+      category_id: categoryId,
+      image_url,
+    };
+
     if (selectedDish) {
-      await supabase
-        .from("dishes")
-        .update({
-          name,
-          price: Number(price), // FIXED
-          category,
-          description,
-          image_url,
-        })
-        .eq("id", selectedDish.id);
+      await supabase.from("dishes").update(dishData).eq("id", selectedDish.id);
+    } else {
+      await supabase.from("dishes").insert([dishData]);
     }
 
-    // ---- Add New Dish ----
-    else {
-      await supabase.from("dishes").insert([
-        {
-          name,
-          price: Number(price), // FIXED
-          category,
-          description,
-          image_url,
-        },
-      ]);
-    }
-
-    // Reset form
     setName("");
     setPrice("");
-    setCategory("");
-    setDescription("");
     setImageFile(null);
 
     onSave();
@@ -120,34 +102,29 @@ export default function DishForm({ selectedDish, onSave }: DishFormProps) {
       />
 
       <input
-        type="text"
-        placeholder="Category"
-        className="border p-2 w-full mb-2"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-        required
-      />
-
-      <textarea
-        placeholder="Description"
-        className="border p-2 w-full mb-2"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        required
-      />
-
-      <input
         type="file"
         onChange={(e) => setImageFile(e.target.files?.[0] || null)}
         className="mb-3"
       />
 
-      <button
-        type="submit"
-        className="bg-green-600 text-white px-4 py-2 rounded"
-      >
-        {selectedDish ? "Update Dish" : "Add Dish"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          className={`px-4 py-2 rounded text-white ${selectedDish ? "bg-blue-600" : "bg-green-600"}`}
+        >
+          {selectedDish ? "Update Dish" : "Add Dish"}
+        </button>
+
+        {selectedDish && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="bg-gray-500 text-white px-4 py-2 rounded"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }

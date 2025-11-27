@@ -1,34 +1,48 @@
 "use client";
 
-import React, { useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const supabase = createClientComponentClient();
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace("/admin");
+    });
+  }, [router, supabase]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    setLoading(false);
+
     if (error) {
       setError(error.message);
       return;
     }
 
-    router.push("/admin"); // redirect to dashboard
+    router.push("/admin");
   };
 
   return (
-    <div className="w-full min-h-screen flex items-center justify-center bg-[#fceee6] relative z-[50]">
+    <div className="w-full min-h-screen flex items-center justify-center bg-[#fceee6]">
       <form
         onSubmit={handleLogin}
         className="p-6 rounded-xl shadow-md w-80 bg-[#fcf3e6]"
@@ -41,6 +55,7 @@ export default function LoginPage() {
           <p className="text-red-500 text-sm mb-2 text-center">{error}</p>
         )}
 
+        {/* Email */}
         <input
           type="email"
           placeholder="Email"
@@ -50,20 +65,37 @@ export default function LoginPage() {
           required
         />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border border-[#903e13] text-[#903e13] placeholder-[#903e13] p-2 rounded mb-3"
-          required
-        />
+        {/* Password with eye toggle */}
+        <div className="relative mb-3">
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-[#903e13] text-[#903e13] placeholder-[#903e13] p-2 rounded pr-10"
+            required
+          />
+
+          {/* Eye Button */}
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2"
+          >
+            {showPassword ? (
+              <img src="/blackeyehide.png" alt="Hide" className="w-5 h-5" />
+            ) : (
+              <img src="/blackeyeshow.png" alt="Show" className="w-5 h-5" />
+            )}
+          </button>
+        </div>
 
         <button
           type="submit"
-          className="w-full py-2 rounded bg-[#903e13] text-[#fcf3e6] active:scale-95 transition"
+          disabled={loading}
+          className="w-full py-2 rounded bg-[#903e13] text-[#fcf3e6] active:scale-95 transition disabled:opacity-50"
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </button>
       </form>
     </div>

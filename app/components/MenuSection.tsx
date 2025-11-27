@@ -2,133 +2,98 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Loader } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+
+interface Category {
+  id: number;
+  name: string;
+  image_url: string;
+}
 
 interface Dish {
   id: string;
   name: string;
   price: number;
   description: string;
-  category: string;
+  category_id: number;
   image_url: string;
 }
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export default function MenuPage() {
-  const [activeCategory, setActiveCategory] = useState("Hot Beverages");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 🧾 Categories + Manual Image Paths
-  const categories = [
-    { name: "Hot Beverages", image: "/images/hotbeverages.png" },
-    { name: "Wadi Special", image: "/images/wadispecial.png" },
-    { name: "Pakoda", image: "/images/Pakoda.png" },
-    { name: "Appetizers", image: "/images/Appetizers.png" },
-    { name: "Toast & Sandwich", image: "/images/freshjuice.png" },
-    { name: "Pizza", image: "/images/pizza.png" },
-    { name: "Fries", image: "/images/fries.png" },
-    { name: "Salad", image: "/images/Salad.png" },
-    { name: "Pav Bhaji", image: "/images/pavbhaji.png" },
-    { name: "Sizzlers", image: "/images/sizzlers.png" },
-    { name: "Fried Kabab", image: "/images/friedkabab.png" },
-    { name: "Soup", image: "/images/soup.png" },
-    { name: "Tandoori Kabab", image: "/images/tandoorikabab.png" },
-    { name: "Continental Starter", image: "/images/lassi.png" },
-    { name: "Chinese Starter", image: "/images/chinesestarter.png" },
-    { name: "Thali Special", image: "/images/thali.png" },
-    { name: "Maharashtrian Special", image: "/images/maharashtrianspc.png" },
-    { name: "Tawa Special", image: "/images/tawaspecial.png" },
-    { name: "Indian Sweet Dish", image: "/images/indiansweetdish.png" },
-    { name: "Paneer Main Course", image: "/images/paneermaincourse.png" },
-    { name: "Veg Main Course", image: "/images/vegmaincourse.png" },
-    { name: "Murali Chef's Spl Punjabi Dishes", image: "/images/muralichefs.png" },
-    { name: "Roti", image: "/images/roti.png" },
-    { name: "Dal", image: "/images/dal.png" },
-    { name: "Bhat Special", image: "/images/bhaatspecial.png" },
-    { name: "Basmati Rice", image: "/images/basmatirice.png" },
-    { name: "Chinese Rice", image: "/images/chinese.png" },
-    { name: "Chinese Noodels", image: "/images/chinese.png" },
-    { name: "Lassi", image: "/images/lassi.png" },
-    { name: "Shakes", image: "/images/shakes.png" },
-    { name: "Mocktails", image: "/images/mocktails.png" },
-    { name: "Fresh Seasonal Juice", image: "/images/freshjuice.png" },
-    { name: "Mojito", image: "/images/mojito.png" },
-    { name: "Dessert", image: "/images/dessert.png" },
-    { name: "Mastani", image: "/images/dessert.png" },
-    { name: "Ice Cream", image: "/images/icecream.png" },
-  ];
-
-  // Supabase credentials
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  // 🔄 Fetch dishes when active category changes
   useEffect(() => {
-    fetchDishesByCategory(activeCategory);
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from("category")
+      .select("*")
+      .order("id", { ascending: true });
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setCategories(data);
+    if (data.length > 0) setActiveCategory(data[0].id);
+  };
+
+  useEffect(() => {
+    if (activeCategory !== null) fetchDishes(activeCategory);
   }, [activeCategory]);
 
-  const fetchDishesByCategory = async (categoryName: string): Promise<void> => {
+  const fetchDishes = async (categoryId: number) => {
     try {
       setLoading(true);
-      setError(null);
+      const { data, error } = await supabase
+        .from("dishes")
+        .select("*")
+        .eq("category_id", categoryId)
+        .order("id", { ascending: true });
 
-      if (!supabaseUrl || !supabaseKey) {
-        setError("Supabase credentials not configured");
-        return;
-      }
-
-      const query = `?select=*&category=ilike.${encodeURIComponent(
-        categoryName
-      )}&order=id.asc`;
-
-      const response = await fetch(`${supabaseUrl}/rest/v1/dishes${query}`, {
-        headers: {
-          apikey: supabaseKey,
-          "Content-Type": "application/json",
-        } as HeadersInit,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch dishes");
-      }
-
-      const data: Dish[] = await response.json();
+      if (error) throw error;
       setDishes(data);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unknown error occurred";
-      setError(message);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔍 Filter dishes based on search term
-  const filteredDishes = dishes.filter(
-    (dish) =>
-      dish.name.toLowerCase().includes(searchTerm.toLowerCase())
-      //dish.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredDishes = dishes.filter((dish) =>
+    dish.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="min-h-screen bg-[#fcf3e6] text-[#903e13]">
-      {/* 🔍 Search Bar */}
+      {/* Search Bar */}
       <div className="px-4 pt-4">
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search starters, mains or desserts..."
-          className="w-full px-4 py-2 rounded-full border-2 border-[#903e13] bg-white text-[#903e13] placeholder-[#903e13]/50 focus:outline-none focus:border-[#903e13]"
+          className="w-full px-4 py-2 rounded-full border-2 border-[#903e13] bg-white text-[#903e13] placeholder-[#903e13]/50"
         />
       </div>
 
-      {/* 🧭 Scrollable Categories */}
-      <div className="relative mt-1">
+      {/* 🧭 Scrollable Categories (2 rows) */}
+      <div className="relative mt-2">
         <div
           id="scrollMenu"
-          className="flex overflow-x-auto scroll-smooth scrollbar-hide px-4 py-2 space-x-3"
+          className="flex overflow-x-auto scroll-smooth scrollbar-hide px-4 py-2 space-x-5"
         >
           {Array.from({ length: Math.ceil(categories.length / 2) }).map(
             (_, colIndex) => (
@@ -140,13 +105,13 @@ export default function MenuPage() {
                   const idx = colIndex * 2 + rowPos;
                   if (idx >= categories.length) return null;
 
-                  const { name, image } = categories[idx];
-                  const isActive = activeCategory === name;
+                  const cat = categories[idx];
+                  const isActive = activeCategory === cat.id;
 
                   return (
                     <button
-                      key={name}
-                      onClick={() => setActiveCategory(name)}
+                      key={cat.id}
+                      onClick={() => setActiveCategory(cat.id)}
                       className="flex flex-col items-center justify-center cursor-pointer focus:outline-none w-16"
                     >
                       <div
@@ -154,20 +119,18 @@ export default function MenuPage() {
                           isActive ? "bg-[#903e13]" : "bg-[#fcf3e6]"
                         }`}
                       >
-                        <Image
-                          src={image}
-                          alt={name}
-                          width={48}
-                          height={48}
+                        <img
+                          src={cat.image_url}
+                          alt={cat.name}
                           className="object-cover w-full h-full"
                         />
                       </div>
 
                       <span
                         className="text-[10px] font-medium text-center w-full truncate text-[#903e13]"
-                        title={name}
+                        title={cat.name}
                       >
-                        {name}
+                        {cat.name}
                       </span>
                     </button>
                   );
@@ -178,59 +141,50 @@ export default function MenuPage() {
         </div>
       </div>
 
-      {/* 📋 Dishes Section */}
+      {/* Dishes Section */}
       <div className="px-4 py-5">
-        <h2 className="text-xl font-bold text-[#903e13] mb-4">
-          {activeCategory}
+        <h2 className="text-xl font-bold mb-4 text-[#903e13]">
+          {categories.find((c) => c.id === activeCategory)?.name || ""}
         </h2>
 
-        {/* Error */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            {error}
-          </div>
+          <div className="bg-red-200 p-3 text-red-800 rounded mb-3">{error}</div>
         )}
 
-        {/* Loading */}
         {loading && (
-          <div className="flex justify-center items-center py-12">
-            <Loader className="w-8 h-8 text-[#903e13] animate-spin" />
-            <span className="ml-2 text-[#903e13]">Loading dishes...</span>
+          <div className="flex justify-center items-center py-10">
+            <Loader className="w-8 h-8 animate-spin" />
+            <span className="ml-2 font-medium">Loading dishes...</span>
           </div>
         )}
 
-        {/* 🟧 Compact Dish Cards */}
         {!loading && filteredDishes.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredDishes.map((dish) => (
               <div
                 key={dish.id}
-                className="bg-white rounded-md shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-[#903e13]/20"
+                className="bg-white rounded-md shadow-sm hover:shadow-md transition overflow-hidden border border-[#903e13]/20"
               >
-                {/* Image */}
                 {dish.image_url && (
                   <div className="h-32 overflow-hidden bg-gray-200">
                     <img
                       src={dish.image_url}
                       alt={dish.name}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform"
+                      className="w-full h-full object-cover hover:scale-105 transition"
                     />
                   </div>
                 )}
 
-                {/* Info */}
                 <div className="p-3">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="text-sm font-semibold text-[#903e13] flex-1 leading-tight">
+                  <div className="flex justify-between mb-1">
+                    <h3 className="text-sm font-semibold flex-1 leading-tight">
                       {dish.name}
                     </h3>
-
-                    <span className="text-sm font-bold text-[#903e13] ml-2 whitespace-nowrap">
+                    <span className="text-sm font-bold whitespace-nowrap">
                       ₹{dish.price}
                     </span>
                   </div>
-
-                  <p className="text-[#903e13]/70 text-xs line-clamp-2 leading-snug">
+                  <p className="text-xs line-clamp-2 text-[#903e13]/70">
                     {dish.description}
                   </p>
                 </div>
@@ -239,14 +193,9 @@ export default function MenuPage() {
           </div>
         )}
 
-        {/* Empty */}
         {!loading && filteredDishes.length === 0 && (
-          <div className="text-center py-10">
-            <p className="text-[#903e13]/60 text-lg">
-              {searchTerm
-                ? "No dishes found matching your search"
-                : "No dishes found in this category"}
-            </p>
+           <div className="flex justify-center items-center py-10">
+            <Loader className="animate-spin w-6 h-6 text-[#903e13]" />
           </div>
         )}
       </div>
