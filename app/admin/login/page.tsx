@@ -16,10 +16,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace("/admin");
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+       router.replace("/admin");
+      }
     });
-  }, [router, supabase]);
+
+  return () => subscription.unsubscribe();
+}, [router, supabase]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +44,6 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/admin");
   };
 
   return (
