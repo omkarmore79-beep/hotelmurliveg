@@ -5,7 +5,14 @@ import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
-  // Initialize Supabase middleware client
+  // 🔒 SAFETY: if env vars missing, skip auth
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return res;
+  }
+
   const supabase = createMiddlewareClient({ req, res });
 
   const {
@@ -14,12 +21,14 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
-  // Redirect non-logged-in users away from /admin pages (except login)
-  if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login") && !session) {
+  if (
+    pathname.startsWith("/admin") &&
+    !pathname.startsWith("/admin/login") &&
+    !session
+  ) {
     return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
-  // Redirect logged-in users away from login page
   if (pathname.startsWith("/admin/login") && session) {
     return NextResponse.redirect(new URL("/admin", req.url));
   }
